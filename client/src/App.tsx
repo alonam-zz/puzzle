@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
+import Countdown from 'react-countdown'
 
 const CONTAINER_WIDTH = 1400
 const CONTAINER_HEIGHT = 650
 const SNAP_EPS = 20 // px: how close an edge must be to stick
 const SIZE_OPTIONS = [2,3,4,5,6];
+const DUE_TIME_OPTIONS = [
+  {sec:0,desc:"ללא"},
+  {sec:60,desc:"דקה"},
+  {sec:120,desc:"2 דקות"},
+  {sec:180,desc:"3 דקות"},
+  {sec:240,desc:"4 דקות"},
+  {sec:300,desc:"5 דקות"},
+]
 
 type Pos = { left: number; top: number }
 
@@ -25,6 +34,9 @@ type ApiPiece = { image: string; currentWidth: number; currentHeight: number ,ro
 
 function App() {
   const [puzzleSize, setPuzzleSize] = useState(SIZE_OPTIONS[0])
+  const [dueTime, setDueTime] = useState(0)
+  const [gameover, setGameOver] = useState(false)
+  const [countDownDueTime, setCountdownDueTime] = useState(0)
   const [imageBuffer, setImageBuffer] = useState("")
   const [isSolved, setIsSolved] = useState(false)
   const [image, setImage] = useState<File | null>(null)
@@ -32,6 +44,7 @@ function App() {
   // positions live in state so a drag can update them (one entry per piece)
   const [positions, setPositions] = useState<Pos[]>([])
 
+  const countdownRef = useRef(null);
 
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
 
@@ -69,8 +82,9 @@ function App() {
         })
       )
       )
-     
-
+      if (dueTime) setCountdownDueTime(Date.now() + dueTime);
+      setGameOver(false);
+      countdownRef.current?.api.start();
       setImageBuffer(data?.imageBuffer??"");
 
     }
@@ -81,6 +95,7 @@ function App() {
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLImageElement>, index: number) => {
+    if (gameover) return;
     const rect = e.currentTarget.getBoundingClientRect();
     // remember where inside the piece the user grabbed
     dragState.current = {
@@ -153,6 +168,7 @@ function App() {
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLImageElement>) => {
+    if (gameover) return;
     const drag = dragState.current;
     const container = containerRef.current;
     if (!drag || !container) return;
@@ -185,6 +201,7 @@ function App() {
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLImageElement>) => {
+    if (gameover) return;
     const drag = dragState.current;
     
     if (drag) {
@@ -254,6 +271,7 @@ function App() {
 
     useEffect(()=>{
       if (isSolved){
+        countdownRef.current?.api.pause();
         solvedImageRef.current.style.left = String(pieces[0].left+'px');
         solvedImageRef.current.style.top = String(pieces[0].top)+'px';
         solvedImageRef.current.style.zIndex = "10000";
@@ -262,19 +280,34 @@ function App() {
     },  
     [isSolved])
 
+
+    const countdownRenderer = ({ formatted })=>{
+       return (
+      <span>
+        {formatted.hours}:{formatted.minutes}:{formatted.seconds}
+      </span>
+    );
+    }
     
   return (
     <>
     <div className="d-flex flex-column gap-3">
-      <div className="row">
+      <div className="align-items-center row">
         
          {pieces.length==0 && (
           <>
           <div className="col-auto">
-          <input className="form-control w-auto" type="file" name="puzzleFile" onChange={(e)=>setImage(e.target.files?.[0] ?? null )}/>
+            <label htmlFor="puzzleFile" className="custom-file-upload bg-warning-subtle" >
+              בחר תמונה
+          </label>
+          <input id="puzzleFile" style={{display:'none'}} className="form-control w-auto" type="file" name="puzzleFile" onChange={(e)=>setImage(e.target.files?.[0] ?? null )}/>
+          {image && <span className="ms-2 text-muted">{image.name}</span>}
           </div>
-          <div className="col-auto">
-          <select value={puzzleSize} name="puzzleSize" className="form-select w-auto" onChange={(e)=>{setPuzzleSize(Number(e.target.value))}}>
+          <div className="col-auto d-inline-block ">
+            <label htmlFor="puzzleSize" className='me-2'>
+              גודל
+            </label>
+          <select value={puzzleSize} id="puzzleSize" name="puzzleSize" className="form-select w-auto d-inline-block" onChange={(e)=>{setPuzzleSize(Number(e.target.value))}}>
               {
               SIZE_OPTIONS.map((s,i)=>(
                 <option key={i} value={s}>{s+'X'+s}</option>
@@ -284,62 +317,100 @@ function App() {
 
           </select>
           </div>
+
+          <div className="col-auto d-inline-block ">
+            <label htmlFor="dueTime" className='me-2'>
+              זמן
+            </label>
+          <select value={dueTime} id="dueTime" name="puzzleSize" className="form-select w-auto d-inline-block" onChange={(e)=>{setDueTime(Number(e.target.value))}}>
+              {
+              DUE_TIME_OPTIONS.map((s,i)=>(
+                <option key={i} value={s.sec*1000}>{s.desc}</option>
+              )
+            )
+          }
+
+          </select>
+          </div>
+
           <div className="col-auto">
           <button className="btn btn-primary" disabled={!image} type="button" onClick={()=>{submitImage();}}>צור פאזל!</button>
           </div>
           </>
          )}
         {pieces.length!=0 && (
-          <div className="col-auto">
-          <button className="btn btn-success" disabled={!image} type="button" onClick={()=>{setPieces([]); setImage(null)}}>צור פאזל חדש</button>
+          <>
+          <div className="col-auto flex-grow-1">
+          <button className="btn btn-success me-2" disabled={!image} type="button" onClick={()=>{setPieces([]); setImage(null)}}>צור פאזל חדש</button>
+          <button className="btn btn-primary" disabled={!image} type="button" onClick={()=>{submitImage();}}>התחל מחדש</button>
           </div>
+        { dueTime!=0 && (
+          <div className="col-auto">
+          {
+            gameover && (
+              <label className='text-danger d-inline-block me-2 fw-bold'>
+              הזמן נגמר!
+            </label>
+            )
+          }
+          <div className="d-inline-block">
+            <Countdown ref={countdownRef}  zeroPadTime={2} date={countDownDueTime} renderer={countdownRenderer} onComplete={()=>{console.log('strstt'); if (!isSolved){ setGameOver(true)}}} />
+          </div>
+          </div>
+        )}
+          </>
         )
+
+        
         }
        
       </div>
 
       <div className="row">
-        <div className="col">
-          <div
+        <div className="col-auto">
+          <div className="card m-auto col-auto bg-light"
             ref={containerRef}
-            className="bg-light"
-            style={{
-              width: `${CONTAINER_WIDTH}px`,
-              height: CONTAINER_HEIGHT,
-              position: 'relative',
-            }}
+              style={{
+                width: `${CONTAINER_WIDTH}px`,
+                height: CONTAINER_HEIGHT,
+                position: 'relative',
+              }}
           >
-            {
-              pieces.map((p, i)=>{
-                return (
-                  <img
-                    className='puzzleParts'
-                    draggable={false}
-                    key={i}
-                    src={p?.image}
-                    onPointerDown={(e)=>onPointerDown(e, i)}
-                    onPointerMove={onPointerMove}
-                    onPointerUp={onPointerUp}
-                    style={{
-                      position: 'absolute',
-                      left: p.left,
-                      top: p.top,
-                      width: p.width,
-                      height: p.height,
-                      zIndex: draggingIndex === i ? 1000 : 1,
-                      cursor: 'grab',
-                      touchAction: 'none',
-                      userSelect: 'none',
-                    }}
-                  />
-                );
-              })
-            }
-            {
-              isSolved && (
-                <img  draggable={false} style={{position: 'absolute',border: '7px solid green'}} ref={solvedImageRef}  />
-              )
-            }
+            <div
+              
+            >
+              {
+                pieces.map((p, i)=>{
+                  return (
+                    <img
+                      className='puzzleParts'
+                      draggable={false}
+                      key={i}
+                      src={p?.image}
+                      onPointerDown={(e)=>onPointerDown(e, i)}
+                      onPointerMove={onPointerMove}
+                      onPointerUp={onPointerUp}
+                      style={{
+                        position: 'absolute',
+                        left: p.left,
+                        top: p.top,
+                        width: p.width,
+                        height: p.height,
+                        zIndex: draggingIndex === i ? 1000 : 1,
+                        cursor: 'grab',
+                        touchAction: 'none',
+                        userSelect: 'none',
+                      }}
+                    />
+                  );
+                })
+              }
+              {
+                isSolved && (
+                  <img  draggable={false} style={{position: 'absolute',border: '7px solid green'}} ref={solvedImageRef}  />
+                )
+              }
+            </div>
           </div>
         </div>
       </div>
