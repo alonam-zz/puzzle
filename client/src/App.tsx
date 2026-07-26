@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type ChangeEventHandler, type EventHandler, type InputEventHandler } from 'react'
 import './App.css'
 import Countdown from 'react-countdown'
+
+const MAX_IMAGE_HEIGHT = import.meta.env.VITE_MAX_IMAGE_HEIGHT;
 
 const CONTAINER_WIDTH = 1400
 const CONTAINER_HEIGHT = 650
@@ -41,6 +43,7 @@ function App() {
   const [isSolved, setIsSolved] = useState(false)
   const [image, setImage] = useState<File | null>(null)
   const [pieces, setPieces] = useState([])
+  const [imagePreview, setImagePreview] = useState("")
   // positions live in state so a drag can update them (one entry per piece)
   const [positions, setPositions] = useState<Pos[]>([])
 
@@ -50,6 +53,7 @@ function App() {
 
   const containerRef = useRef<HTMLDivElement>(null)
   const solvedImageRef = useRef<HTMLImageElement>(null)
+  const previewImageRef = useRef<HTMLImageElement>(null)
   // drag internals kept in a ref so moving the mouse doesn't re-render on its own
   const dragState = useRef<{ index: number; offsetX: number; offsetY: number } | null>(null)
 
@@ -144,7 +148,8 @@ function App() {
             }
           }
         }
-        else if (diff==puzzleSize && inGroupElem.col==n.col){ console.log("same col");
+        else if (diff==puzzleSize && inGroupElem.col==n.col){ 
+          console.log("same col");
           // stacked: only snap if they overlap horizontally (same column-ish)
           console.log("L",L,"nR",nR,"nL",nL,"R",R);
           const hOverlap = (L < nR && L > nL) || (R<nR && R>nL);
@@ -272,13 +277,60 @@ function App() {
     useEffect(()=>{
       if (isSolved){
         countdownRef.current?.api.pause();
-        solvedImageRef.current.style.left = String(pieces[0].left+'px');
-        solvedImageRef.current.style.top = String(pieces[0].top)+'px';
+        
         solvedImageRef.current.style.zIndex = "10000";
         solvedImageRef.current.src=`data:image/png;base64,${imageBuffer}`;
+      
       }
     },  
     [isSolved])
+
+    const onSetImage = (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+
+      if (!file) {
+        setImageBuffer("");
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        alert("יש לבחור תמונה");
+        e.target.value = "";
+        return;
+      }
+
+
+      const reader = new FileReader();
+
+      setImage(file);
+
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      if (typeof dataUrl !== "string") return;
+      // Only the Base64 part:
+      const base64 = dataUrl.split(",")[1];
+      setImagePreview(base64);
+    }
+
+    reader.onerror = () => {
+      console.error("Failed to read the image");
+    };
+
+    reader.readAsDataURL(file);
+
+      
+      // solvedImageRef.current.src=`data:image/png;base64,${imageBuffer}`;
+    }
+
+    useEffect(()=>{
+      if (imagePreview){
+        previewImageRef.current.src=`data:image/png;base64,${imagePreview}`;
+        previewImageRef.current.style.zIndex = "10000";
+        previewImageRef.current.style.height = MAX_IMAGE_HEIGHT+'px';
+      }
+    },  
+    [imagePreview])
+
 
 
     const countdownRenderer = ({ formatted })=>{
@@ -298,9 +350,9 @@ function App() {
           <>
           <div className="col-auto">
             <label htmlFor="puzzleFile" className="custom-file-upload bg-warning-subtle" >
-              בחר תמונה
+              בחירת תמונה
           </label>
-          <input id="puzzleFile" style={{display:'none'}} className="form-control w-auto" type="file" name="puzzleFile" onChange={(e)=>setImage(e.target.files?.[0] ?? null )}/>
+          <input id="puzzleFile" style={{display:'none'}} className="form-control w-auto" type="file" name="puzzleFile" onChange={(e)=>onSetImage(e)}/>
           {image && <span className="ms-2 text-muted">{image.name}</span>}
           </div>
           <div className="col-auto d-inline-block ">
@@ -379,7 +431,7 @@ function App() {
             <div
               
             >
-              {
+              { !isSolved && 
                 pieces.map((p, i)=>{
                   return (
                     <img
@@ -407,7 +459,12 @@ function App() {
               }
               {
                 isSolved && (
-                  <img  draggable={false} style={{position: 'absolute',border: '7px solid green'}} ref={solvedImageRef}  />
+                  <img  className='solvedimage' draggable={false} style={{position: 'absolute',border: '7px solid green'}} ref={solvedImageRef}  />
+                )
+              }
+              {
+                 pieces.length==0 && (
+                  <img  draggable={false} className={`imagePreview ` +(!imagePreview?'d-none':'')} style={{position: 'absolute',opacity: '0.5' }} ref={previewImageRef}  />
                 )
               }
             </div>
