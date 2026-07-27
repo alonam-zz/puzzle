@@ -4,10 +4,13 @@ WORKDIR /app
 
 COPY package*.json ./
 
+ARG VITE_MAX_IMAGE_HEIGHT
+ENV VITE_MAX_IMAGE_HEIGHT=$VITE_MAX_IMAGE_HEIGHT
+
 RUN npm ci --omit=dev
 
 COPY . .
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["npm", "start"]

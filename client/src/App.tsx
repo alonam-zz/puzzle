@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ChangeEventHandler, type EventHandler, type InputEventHandler } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import './App.css'
-import Countdown from 'react-countdown'
+import Countdown, { type CountdownRenderProps } from 'react-countdown'
 
 const MAX_IMAGE_HEIGHT = import.meta.env.VITE_MAX_IMAGE_HEIGHT;
 
@@ -42,12 +42,11 @@ function App() {
   const [imageBuffer, setImageBuffer] = useState("")
   const [isSolved, setIsSolved] = useState(false)
   const [image, setImage] = useState<File | null>(null)
-  const [pieces, setPieces] = useState([])
+  const [pieces, setPieces] = useState<Piece[]>([])
   const [imagePreview, setImagePreview] = useState("")
-  // positions live in state so a drag can update them (one entry per piece)
-  const [positions, setPositions] = useState<Pos[]>([])
 
-  const countdownRef = useRef(null);
+
+  const countdownRef = useRef<Countdown>(null);
 
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
 
@@ -88,7 +87,7 @@ function App() {
       )
       if (dueTime) setCountdownDueTime(Date.now() + dueTime);
       setGameOver(false);
-      countdownRef.current?.api.start();
+      countdownRef.current?.api?.start();
       setImageBuffer(data?.imageBuffer??"");
 
     }
@@ -114,7 +113,7 @@ function App() {
 
   // If any edge of the dragged piece is within SNAP_EPS of a neighbour's
   // opposing edge (and they roughly share the perpendicular axis), stick to it.
-  const snapGroupToNeighbour = (group:number,left: number, top: number, index: number, all: Piece[]) => {
+  const snapGroupToNeighbour = (group:number, all: Piece[]) => {
     let dx=0,dy = 0;
 
     const inGroup = all.filter((p)=>p.groupId==group);
@@ -137,7 +136,6 @@ function App() {
           // side-by-side: only snap if they overlap vertically (same row-ish)
           const vOverlap = (T < nB && T > nT) || (B>nT && B<nB);
           if (vOverlap) { 
-            console.log("vOverlap!!!");  
             let matched = false;
             
             if (Math.abs(R - nL) <= SNAP_EPS && inGroupElem.counter<n.counter) { dx = nL-R; matched = true; }// stick to neighbour's left
@@ -149,16 +147,14 @@ function App() {
           }
         }
         else if (diff==puzzleSize && inGroupElem.col==n.col){ 
-          console.log("same col");
+        
           // stacked: only snap if they overlap horizontally (same column-ish)
-          console.log("L",L,"nR",nR,"nL",nL,"R",R);
           const hOverlap = (L < nR && L > nL) || (R<nR && R>nL);
           if (hOverlap) { 
-            console.log("hOverlap!!!");
             let matched = false; 
             
-            if (Math.abs(B - nT) <= SNAP_EPS && inGroupElem.counter<n.counter) { console.log("real top before change:",inGroupElem.top); dy = nT - B; matched=true;}// stick above neighbour
-            else if (Math.abs(T - nB) <= SNAP_EPS && inGroupElem.counter>n.counter) {console.log("real top before change:",inGroupElem.top); dy = nB - T ; matched=true;} // stick below neighbour
+            if (Math.abs(B - nT) <= SNAP_EPS && inGroupElem.counter<n.counter) {  dy = nT - B; matched=true;}// stick above neighbour
+            else if (Math.abs(T - nB) <= SNAP_EPS && inGroupElem.counter>n.counter) { dy = nB - T ; matched=true;} // stick below neighbour
             if (matched){
               dx = (L < nR && L > nL) ? nL - L : nR - R;
               neighbour = n;
@@ -215,9 +211,9 @@ function App() {
       
       setPieces(prev =>{
         let dragged_piece = prev[drag.index];  
-            let {dx,dy,neighbour} = 
-              snapGroupToNeighbour(dragged_piece.groupId,dragged_piece.left, dragged_piece.top, drag.index, prev);
-            return prev.map((p, i) => {
+            let {dx,dy,neighbour} =
+              snapGroupToNeighbour(dragged_piece.groupId, prev);
+            return prev.map((p) => {
               
                 if (p.groupId==dragged_piece.groupId){
                   return {...p,left:p.left+dx,top:p.top+dy}
@@ -276,11 +272,13 @@ function App() {
 
     useEffect(()=>{
       if (isSolved){
-        countdownRef.current?.api.pause();
-        
-        solvedImageRef.current.style.zIndex = "10000";
-        solvedImageRef.current.src=`data:image/png;base64,${imageBuffer}`;
-      
+        countdownRef.current?.api?.pause();
+
+        const solvedImg = solvedImageRef.current;
+        if (solvedImg){
+          solvedImg.style.zIndex = "10000";
+          solvedImg.src=`data:image/png;base64,${imageBuffer}`;
+        }
       }
     },  
     [isSolved])
@@ -323,17 +321,18 @@ function App() {
     }
 
     useEffect(()=>{
-      if (imagePreview){
-        previewImageRef.current.src=`data:image/png;base64,${imagePreview}`;
-        previewImageRef.current.style.zIndex = "10000";
-        previewImageRef.current.style.height = MAX_IMAGE_HEIGHT+'px';
+      const previewImg = previewImageRef.current;
+      if (imagePreview && previewImg){
+        previewImg.src=`data:image/png;base64,${imagePreview}`;
+        previewImg.style.zIndex = "10000";
+        previewImg.style.height = MAX_IMAGE_HEIGHT+'px';
       }
     },  
     [imagePreview])
 
 
 
-    const countdownRenderer = ({ formatted })=>{
+    const countdownRenderer = ({ formatted }: CountdownRenderProps)=>{
        return (
       <span>
         {formatted.hours}:{formatted.minutes}:{formatted.seconds}
@@ -393,7 +392,7 @@ function App() {
         {pieces.length!=0 && (
           <>
           <div className="col-auto flex-grow-1">
-          <button className="btn btn-success me-2" disabled={!image} type="button" onClick={()=>{setPieces([]); setImage(null)}}>צור פאזל חדש</button>
+          <button className="btn btn-success me-2" disabled={!image} type="button" onClick={()=>{setPieces([]); setImage(null); setImagePreview("")}}>צור פאזל חדש</button>
           <button className="btn btn-primary" disabled={!image} type="button" onClick={()=>{submitImage();}}>התחל מחדש</button>
           </div>
         { dueTime!=0 && (
@@ -406,7 +405,7 @@ function App() {
             )
           }
           <div className="d-inline-block">
-            <Countdown ref={countdownRef}  zeroPadTime={2} date={countDownDueTime} renderer={countdownRenderer} onComplete={()=>{console.log('strstt'); if (!isSolved){ setGameOver(true)}}} />
+            <Countdown ref={countdownRef}  zeroPadTime={2} date={countDownDueTime} renderer={countdownRenderer} onComplete={()=>{if (!isSolved){ setGameOver(true)}}} />
           </div>
           </div>
         )}

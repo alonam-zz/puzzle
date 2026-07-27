@@ -1,9 +1,21 @@
+html, body {
+  min-height: 100vh;
+  margin: 0;
+}
+
+body {
+  /* soft diagonal gradient page background */
+  background: linear-gradient(135deg, #eef2ff 0%, #e0f2fe 45%, #f5f3ff 100%);
+  background-attachment: fixed;
+}
+
 #root {
   max-width: 1780px;
   margin: 0 auto;
-  /* padding: 2rem; */
+  padding: 1.5rem;
   text-align: start;
   width:100%;
+  min-height: 100vh;
 }
 
 :root {

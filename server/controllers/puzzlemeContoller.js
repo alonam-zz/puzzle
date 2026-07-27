@@ -2,6 +2,8 @@
 import sharp from "sharp"
 // Get active areas grouped for the <Select> component.
 async function puzzleMe(req, res){
+
+    const maxImageHeight = Number(process.env.VITE_MAX_IMAGE_HEIGHT);
    try {
     if (!req.file) {
       return res.status(400).json({
@@ -32,11 +34,11 @@ async function puzzleMe(req, res){
         })
     }
 
-    if (imageHeight>600){
+    if (imageHeight>maxImageHeight){
          imageBuffer = await sharp(req.file.buffer)
             .autoOrient()
             .resize({
-                height: 600,
+                height: maxImageHeight,
                 withoutEnlargement: true,
             })
             .toBuffer();

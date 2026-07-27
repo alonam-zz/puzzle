@@ -1,0 +1,32 @@
+services:
+  server:
+    build:
+      context: ./server
+      network: host
+
+    restart: unless-stopped
+
+    environment:
+      NODE_ENV: production
+      SERVER_PORT: 3001        
+      VITE_MAX_IMAGE_HEIGHT: ${VITE_MAX_IMAGE_HEIGHT}
+      
+      DOMAIN: ${DOMAIN}
+
+    ports:
+      - "3001:3001"
+
+  client:
+    build:
+      context: ./client
+      network: host
+      args:
+        VITE_MAX_IMAGE_HEIGHT: ${VITE_MAX_IMAGE_HEIGHT}
+
+    restart: unless-stopped
+
+    depends_on:
+      - server
+
+    ports:
+      - "5173:80"
