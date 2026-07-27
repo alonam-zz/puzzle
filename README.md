@@ -1,7 +1,8 @@
 # Puzzle
 
 ## Screenshots
- ![puzzle 01](docs/screenshots/01.png) | ![puzzle 02](docs/screenshots/02.png) |
+|---|---|
+| ![puzzle 01](docs/screenshots/01.png) | ![puzzle 02](docs/screenshots/02.png) |
 | ![puzzle 03](docs/screenshots/03.png) | ![puzzle 04](docs/screenshots/04.png) |
 
 A browser jigsaw puzzle game with a Hebrew UI. Upload any image, pick a grid size, and the
